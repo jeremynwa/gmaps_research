@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  reviewinsight:
+    build: .
+    container_name: reviewinsight-core
+    env_file:
+      - .env
+    volumes:
+      # Mount data directories
+      - ./data:/app/data
+      # Mount source for development
+      - ./src:/app/src
+      - ./cli:/app/cli
+      - ./config:/app/config
+    command: tail -f /dev/null  # Keep container running
+    networks:
+      - reviewinsight-network
+
+  # Optional: Redis for job queue (future use)
+  redis:
+    image: redis:7-alpine
+    container_name: reviewinsight-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - reviewinsight-network
+
+  # Optional: PostgreSQL for metadata (future use)
+  postgres:
+    image: postgres:15-alpine
+    container_name: reviewinsight-postgres
+    environment:
+      POSTGRES_USER: reviewinsight
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: reviewinsight
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - reviewinsight-network
+
+volumes:
+  redis-data:
+  postgres-data:
+
+networks:
+  reviewinsight-network:
+    driver: bridge
