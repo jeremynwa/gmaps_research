@@ -1,6 +1,4 @@
 """Configuration settings for ReviewInsight Core."""
-pip install dotenv
-
 import os
 from pathlib import Path
 from typing import List

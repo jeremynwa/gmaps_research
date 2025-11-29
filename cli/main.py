@@ -4,6 +4,8 @@ import click
 from pathlib import Path
 from rich.console import Console
 from rich.table import Table
+from datetime import datetime
+import re
 
 from config.settings import Config
 from src.analyzers.anthropic_analyzer import AnthropicAnalyzer
@@ -16,6 +18,18 @@ from src.exporters.json_exporter import JSONExporter
 from src.utils.cost_calculator import CostCalculator
 
 console = Console()
+
+
+def sanitize_filename(text: str) -> str:
+    """Convert text to safe filename."""
+    # Remove special characters, keep alphanumeric and spaces
+    text = re.sub(r'[^\w\s-]', '', text)
+    # Replace spaces with underscores
+    text = re.sub(r'\s+', '_', text)
+    # Remove multiple underscores
+    text = re.sub(r'_+', '_', text)
+    # Limit length
+    return text[:50].strip('_')
 
 
 @click.group()
@@ -64,15 +78,20 @@ def analyze(input, output, workers, mock, format):
     orchestrator = Orchestrator(analyzer)
     df_results = orchestrator.analyze(reviews, max_workers=workers)
     
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    input_name = Path(input).stem
+    base_filename = f"{sanitize_filename(input_name)}_{timestamp}"
+    
     # Export results
     output_dir = Path(output) if output else Config.OUTPUT_DIR
     
     if format in ['excel', 'both']:
-        excel_path = ExcelExporter.export(df_results, output_path=output_dir / "results.xlsx")
+        excel_path = ExcelExporter.export(df_results, output_path=output_dir / f"{base_filename}.xlsx")
         console.print(f"\n[green]✅ Excel saved: {excel_path}[/green]")
     
     if format in ['json', 'both']:
-        json_path = JSONExporter.export(df_results, output_path=output_dir / "results.json")
+        json_path = JSONExporter.export(df_results, output_path=output_dir / f"{base_filename}.json")
         console.print(f"[green]✅ JSON saved: {json_path}[/green]")
 
 
@@ -123,12 +142,18 @@ def scrape(name, location, max_reviews, competitors, output, workers, analyze_no
     
     console.print(f"\n[green]✅ Total reviews scraped: {len(all_reviews)}[/green]")
     
+    # Generate filename: restaurant_location_timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    resto_safe = sanitize_filename(name)
+    location_safe = sanitize_filename(location) if location else "NoLocation"
+    scraped_filename = f"{resto_safe}_{location_safe}_scraped_{timestamp}.xlsx"
+    
     # Save scraped data
     import pandas as pd
     df_scraped = pd.DataFrame(all_reviews)
     
     output_dir = Path(output) if output else Config.OUTPUT_DIR
-    scraped_file = output_dir / "scraped_reviews.xlsx"
+    scraped_file = output_dir / scraped_filename
     df_scraped.to_excel(scraped_file, index=False)
     
     console.print(f"[green]💾 Scraped data saved: {scraped_file}[/green]")
@@ -149,8 +174,11 @@ def scrape(name, location, max_reviews, competitors, output, workers, analyze_no
         orchestrator = Orchestrator(analyzer)
         df_results = orchestrator.analyze(all_reviews, max_workers=workers)
         
+        # Generate analysis filename with same pattern
+        analysis_filename = f"{resto_safe}_{location_safe}_analysis_{timestamp}.xlsx"
+        
         # Export
-        excel_path = ExcelExporter.export(df_results, output_path=output_dir / "analysis_results.xlsx")
+        excel_path = ExcelExporter.export(df_results, output_path=output_dir / analysis_filename)
         console.print(f"\n[green]✅ Analysis saved: {excel_path}[/green]")
 
 
