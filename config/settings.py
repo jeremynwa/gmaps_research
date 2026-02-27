@@ -65,21 +65,25 @@ class Config:
     # Cost tracking
     MAX_COST_PER_RUN = float(os.getenv("MAX_COST_PER_RUN", "500"))
     WARN_COST_THRESHOLD = float(os.getenv("WARN_COST_THRESHOLD", "100"))
-    
+
     # Pricing (per million tokens)
     CLAUDE_INPUT_PRICE = 3.0
     CLAUDE_OUTPUT_PRICE = 15.0
     CLAUDE_CACHE_WRITE_MULTIPLIER = 1.25
     CLAUDE_CACHE_READ_MULTIPLIER = 0.10
     OUTSCRAPER_PRICE_PER_1K = 1.50
-    
+
+    # Processing constants
+    MIN_REVIEW_LENGTH = 20
+    CACHE_SAVE_INTERVAL = 50
+    CACHE_PROPAGATION_DELAY = 5
+    PROGRESS_LOG_INTERVAL = 10
+    DEFAULT_LANGUAGE = "fr"
+    FILENAME_MAX_LENGTH = 50
+
     @classmethod
-    def validate(cls):
+    def validate(cls) -> bool:
         """Validate required configuration."""
         if not cls.ANTHROPIC_API_KEY:
             raise ValueError("ANTHROPIC_API_KEY is required")
         return True
-
-
-# Validate on import
-Config.validate()
