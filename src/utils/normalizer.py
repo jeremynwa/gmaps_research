@@ -1,11 +1,12 @@
 """Utility for normalizing location names."""
 
+from functools import lru_cache
 from typing import Dict
 
 
 class GareNormalizer:
     """Normalize gare/station names to standard format."""
-    
+
     # Mapping of variations to standard names
     MAPPINGS: Dict[str, str] = {
         # Paris stations
@@ -15,7 +16,7 @@ class GareNormalizer:
         "PARIS-GSL": "Paris Saint-Lazare",
         "PARIS-GMP": "Paris Montparnasse",
         "PARIS-LA-DEFENSE": "Paris La Défense",
-        
+
         # Other major stations
         "LYON-PART-DIEU": "Lyon Part-Dieu",
         "LYON-PERRACHE": "Lyon Perrache",
@@ -28,43 +29,33 @@ class GareNormalizer:
         "NANTES": "Nantes",
         "MONTPELLIER-ST-ROCH": "Montpellier Saint-Roch",
         "ROISSY": "Paris CDG Airport",
-        
+
         # Add more mappings as needed
     }
-    
-    @classmethod
-    def normalize(cls, gare_name: str) -> str:
-        """
-        Normalize a gare name to standard format.
-        
-        Args:
-            gare_name: Raw gare name (e.g., "FR PARIS-GDL")
-            
-        Returns:
-            Normalized name (e.g., "Paris Gare de Lyon")
-        """
+
+    @staticmethod
+    @lru_cache(maxsize=256)
+    def normalize(gare_name: str) -> str:
+        """Normalize a gare name to standard format."""
         if not gare_name or str(gare_name).strip() == "":
             return "Unknown"
-        
-        # Remove country prefix
+
         name = str(gare_name).replace("FR ", "").strip()
-        
-        # Check if we have a direct mapping
-        if name in cls.MAPPINGS:
-            return cls.MAPPINGS[name]
-        
-        # Try to extract the main station name
-        # e.g., "PARIS-GDL MCDO" -> "PARIS-GDL"
+
+        if name in GareNormalizer.MAPPINGS:
+            return GareNormalizer.MAPPINGS[name]
+
         parts = name.split()
         if len(parts) > 0:
             station_code = parts[0]
-            if station_code in cls.MAPPINGS:
-                return cls.MAPPINGS[station_code]
-        
-        # Return as-is if no mapping found
+            if station_code in GareNormalizer.MAPPINGS:
+                return GareNormalizer.MAPPINGS[station_code]
+
         return name
-    
+
     @classmethod
-    def add_mapping(cls, code: str, full_name: str):
+    def add_mapping(cls, code: str, full_name: str) -> None:
         """Add a new mapping."""
         cls.MAPPINGS[code] = full_name
+        # Clear the cache since mappings changed
+        GareNormalizer.normalize.cache_clear()

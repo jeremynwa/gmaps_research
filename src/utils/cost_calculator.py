@@ -81,8 +81,13 @@ class CostCalculator:
         Returns:
             Cost breakdown
         """
+        if num_reviews < 0:
+            raise ValueError("num_reviews must be non-negative")
+        if not 0 <= cache_hit_rate <= 1:
+            raise ValueError("cache_hit_rate must be between 0 and 1")
+
         breakdown = CostBreakdown()
-        
+
         if num_reviews == 0:
             return breakdown
         
