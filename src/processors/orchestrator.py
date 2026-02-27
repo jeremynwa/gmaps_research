@@ -1,16 +1,21 @@
 """Orchestrator for managing analysis workflow."""
 
+from __future__ import annotations
+
+import logging
 import time
 import threading
 from pathlib import Path
 from typing import List, Dict, Optional
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 
 from config.settings import Config
 from src.analyzers.base import BaseAnalyzer
 from src.processors.cache_manager import CacheManager
 from src.utils.progress_tracker import ProgressTracker
+
+logger = logging.getLogger(__name__)
 
 
 class Orchestrator:
@@ -62,12 +67,12 @@ class Orchestrator:
         # Check cache
         if self.use_cache:
             with self.cache_lock:
-                if self.cache.exists(cache_key):
-                    cached = self.cache.get(cache_key)
-                    result = {**review, **cached}
-                    if tracker:
-                        tracker.increment(was_cached=True)
-                    return result, True
+                cached = self.cache.get(cache_key)
+            if cached is not None:
+                result = {**review, **cached}
+                if tracker:
+                    tracker.increment(was_cached=True)
+                return result, True
         
         # Analyze
         establishment = str(review.get('Establishment', ''))
@@ -102,8 +107,8 @@ class Orchestrator:
             
             return {**review, **scores}, False
             
-        except Exception as e:
-            print(f"   ❌ Error analyzing review: {str(e)}")
+        except (ValueError, TypeError, KeyError) as e:
+            logger.error("Error analyzing review: %s", e)
             if tracker:
                 tracker.increment(was_error=True)
             return {**review, **scores}, False
@@ -130,10 +135,10 @@ class Orchestrator:
         total = len(reviews)
         
         if verbose:
-            print(f"\n🚀 ANALYSIS STARTING")
-            print(f"📊 Total reviews: {total}")
-            print(f"⚡ Workers: {max_workers}")
-            print(f"💾 Cache: {'Enabled' if self.use_cache else 'Disabled'}")
+            logger.info("ANALYSIS STARTING")
+            logger.info("Total reviews: %d", total)
+            logger.info("Workers: %d", max_workers)
+            logger.info("Cache: %s", "Enabled" if self.use_cache else "Disabled")
         
         tracker = ProgressTracker(total)
         results = []
@@ -142,7 +147,7 @@ class Orchestrator:
         reviews_to_analyze = []
         for review in reviews:
             review_text = str(review.get('Avis', ''))
-            if len(review_text.strip()) >= 20:
+            if len(review_text.strip()) >= Config.MIN_REVIEW_LENGTH:
                 reviews_to_analyze.append(review)
             else:
                 # Add with N/A scores
@@ -151,8 +156,8 @@ class Orchestrator:
                 tracker.increment(was_skipped=True)
         
         if verbose:
-            print(f"📝 Reviews to analyze: {len(reviews_to_analyze)}")
-            print(f"⏭️  Skipped (too short): {tracker.stats.skipped}\n")
+            logger.info("Reviews to analyze: %d", len(reviews_to_analyze))
+            logger.info("Skipped (too short): %d", tracker.stats.skipped)
         
         if len(reviews_to_analyze) == 0:
             return pd.DataFrame(results)
@@ -161,7 +166,7 @@ class Orchestrator:
         # STEP 1: Analyze FIRST review alone to create cache
         # ============================================================================
         if verbose:
-            print("🔄 Initializing Anthropic cache...")
+            logger.info("Initializing Anthropic cache...")
         
         first_review = reviews_to_analyze[0]
         result, was_cached = self._analyze_single_review(first_review, tracker)
@@ -170,21 +175,21 @@ class Orchestrator:
         if verbose:
             establishment = first_review.get('Establishment', 'N/A')
             site = first_review.get('Site', 'N/A')
-            print(f"[1/{total}] {establishment} - {site}")
+            logger.info("[1/%d] %s - %s", total, establishment, site)
             if was_cached:
-                print(f"   💾 From local cache")
+                logger.info("From local cache")
             else:
-                print(f"   📝 Anthropic cache initialized!\n")
+                logger.info("Anthropic cache initialized!")
         
         # Wait for cache to propagate
-        time.sleep(5)
+        time.sleep(Config.CACHE_PROPAGATION_DELAY)
         
         # ============================================================================
         # STEP 2: Analyze rest in PARALLEL (uses cache!)
         # ============================================================================
         if len(reviews_to_analyze) > 1:
             if verbose:
-                print(f"⚡ Processing {len(reviews_to_analyze) - 1} reviews with {max_workers} workers...\n")
+                logger.info("Processing %d reviews with %d workers...", len(reviews_to_analyze) - 1, max_workers)
             
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # Submit all remaining reviews
@@ -194,30 +199,30 @@ class Orchestrator:
                 }
                 
                 # Collect results
-                for i, future in enumerate(futures, start=2):
+                for i, future in enumerate(as_completed(futures), start=2):
                     try:
-                        result, was_cached = future.result()
+                        result, was_cached = future.result(timeout=120)
                         results.append(result)
                         
-                        if verbose and i % 10 == 0:
+                        if verbose and i % Config.PROGRESS_LOG_INTERVAL == 0:
                             review = futures[future]
                             establishment = review.get('Establishment', 'N/A')
                             site = review.get('Site', 'N/A')
-                            print(f"[{i}/{total}] {establishment} - {site}")
+                            logger.info("[%d/%d] %s - %s", i, total, establishment, site)
                             if was_cached:
-                                print(f"   💾 Cache")
+                                logger.info("Cache hit")
                             else:
-                                print(f"   ✅ Analyzed")
+                                logger.info("Analyzed")
                         
                         # Save cache periodically
                         if i % save_every == 0 and self.use_cache:
                             with self.cache_lock:
                                 self.cache.save_cache()
                             if verbose:
-                                print(f"\n   💾 Cache saved ({i}/{total})\n")
+                                logger.info("Cache saved (%d/%d)", i, total)
                     
-                    except Exception as e:
-                        print(f"   ❌ Error: {str(e)}")
+                    except (ValueError, TypeError, KeyError) as e:
+                        logger.error("Error: %s", e)
                         review = futures[future]
                         scores = {criterion: "ERROR" for criterion in Config.CRITERIA}
                         results.append({**review, **scores})
@@ -228,7 +233,7 @@ class Orchestrator:
         
         # Print final stats
         if verbose:
-            print(f"\n✅ ANALYSIS COMPLETE")
-            print(tracker.get_stats())
+            logger.info("ANALYSIS COMPLETE")
+            logger.info(tracker.get_stats())
         
         return pd.DataFrame(results)

@@ -1,12 +1,15 @@
 """JSON export functionality."""
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 import pandas as pd
 
 from config.settings import Config
+
+logger = logging.getLogger(__name__)
 
 
 class JSONExporter:
@@ -40,8 +43,8 @@ class JSONExporter:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
-        print(f"\n💾 Exporting to JSON...")
-        print(f"   File: {output_path.name}")
+        logger.info("Exporting to JSON...")
+        logger.info("File: %s", output_path.name)
         
         # Convert DataFrame to dict
         data = df.to_dict('records')
@@ -53,7 +56,7 @@ class JSONExporter:
             else:
                 json.dump(data, f, ensure_ascii=False)
         
-        print(f"   ✅ Export successful")
-        print(f"   • Records: {len(data)}")
+        logger.info("Export successful")
+        logger.info("Records: %d", len(data))
         
         return output_path

@@ -1,10 +1,15 @@
 """Load reviews from CSV/Excel files."""
 
+from __future__ import annotations
+
+import logging
 from pathlib import Path
 from typing import List, Dict, Optional
 import pandas as pd
 
 from src.scrapers.base import BaseScraper
+
+logger = logging.getLogger(__name__)
 
 
 class CSVLoader(BaseScraper):
@@ -23,7 +28,7 @@ class CSVLoader(BaseScraper):
         self,
         query: str,  # File path in this case
         location: str = "",
-        max_reviews: int = None,
+        max_reviews: Optional[int] = None,
         **kwargs
     ) -> List[Dict]:
         """
@@ -43,7 +48,7 @@ class CSVLoader(BaseScraper):
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
         
-        print(f"📁 Loading reviews from: {file_path.name}")
+        logger.info("Loading reviews from: %s", file_path.name)
         
         # Load file based on extension
         if file_path.suffix.lower() in ['.xlsx', '.xls']:
@@ -56,14 +61,14 @@ class CSVLoader(BaseScraper):
         # Validate columns
         missing_cols = [col for col in self.REQUIRED_COLUMNS if col not in df.columns]
         if missing_cols:
-            print(f"   ⚠️ Missing columns: {missing_cols}")
-            print(f"   Available columns: {df.columns.tolist()}")
+            logger.warning("Missing columns: %s", missing_cols)
+            logger.warning("Available columns: %s", df.columns.tolist())
         
         # Limit reviews if specified
         if max_reviews and max_reviews < len(df):
             df = df.head(max_reviews)
         
-        print(f"   ✅ Loaded {len(df)} reviews")
+        logger.info("Loaded %d reviews", len(df))
         
         # Convert to list of dicts
         reviews = df.to_dict('records')

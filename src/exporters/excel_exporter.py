@@ -1,11 +1,14 @@
 """Excel export functionality."""
 
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 import pandas as pd
 
 from config.settings import Config
+
+logger = logging.getLogger(__name__)
 
 
 class ExcelExporter:
@@ -39,14 +42,14 @@ class ExcelExporter:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
-        print(f"\n💾 Exporting to Excel...")
-        print(f"   File: {output_path.name}")
+        logger.info("Exporting to Excel...")
+        logger.info("File: %s", output_path.name)
         
         # Sort: valid reviews first, empty reviews last
         if sort_empty_last:
             df_sorted = df.copy()
             df_sorted['_has_text'] = df_sorted['Avis'].apply(
-                lambda x: 0 if (pd.isna(x) or str(x).strip() == "" or len(str(x).strip()) < 20) else 1
+                lambda x: 0 if (pd.isna(x) or str(x).strip() == "" or len(str(x).strip()) < Config.MIN_REVIEW_LENGTH) else 1
             )
             df_sorted = df_sorted.sort_values('_has_text', ascending=False)
             df_sorted = df_sorted.drop(columns=['_has_text'])
@@ -72,11 +75,11 @@ class ExcelExporter:
             df_scores.to_excel(writer, sheet_name='Scores', index=False)
             df_keywords.to_excel(writer, sheet_name='Keywords', index=False)
         
-        print(f"   ✅ Export successful")
-        print(f"\n📋 SUMMARY:")
-        print(f"   • Rows: {len(df_sorted)}")
-        print(f"   • Columns: {len(df_sorted.columns)}")
-        print(f"   • Sheets: Scores ({len(df_scores.columns)} cols), Keywords ({len(df_keywords.columns)} cols)")
+        logger.info("Export successful")
+        logger.info("SUMMARY:")
+        logger.info("Rows: %d", len(df_sorted))
+        logger.info("Columns: %d", len(df_sorted.columns))
+        logger.info("Sheets: Scores (%d cols), Keywords (%d cols)", len(df_scores.columns), len(df_keywords.columns))
         
         # Calculate some stats
         for criterion in ['nourriture_qualite_score', 'rapidite_service_score', 'prix_rapport_qualite_score']:
@@ -85,6 +88,6 @@ class ExcelExporter:
                 valid_count = numeric_values.notna().sum()
                 if valid_count > 0:
                     mean_score = numeric_values.mean()
-                    print(f"   • {criterion}: {mean_score:.1f}/100 (n={valid_count})")
+                    logger.info("%s: %.1f/100 (n=%d)", criterion, mean_score, valid_count)
         
         return output_path

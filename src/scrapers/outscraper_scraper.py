@@ -1,10 +1,13 @@
 """Google Maps scraper using Outscraper API."""
 
+import logging
 from typing import List, Dict, Optional
 from outscraper import ApiClient
 
 from config.settings import Config
 from src.scrapers.base import BaseScraper
+
+logger = logging.getLogger(__name__)
 
 
 class OutscraperScraper(BaseScraper):
@@ -40,10 +43,10 @@ class OutscraperScraper(BaseScraper):
         Returns:
             List of review dictionaries with standardized format
         """
-        print(f"🔍 Scraping Google Maps: {query}")
+        logger.info("Scraping Google Maps: %s", query)
         if location:
-            print(f"   📍 Location: {location}")
-        print(f"   📊 Max reviews: {max_reviews}")
+            logger.info("Location: %s", location)
+        logger.info("Max reviews: %d", max_reviews)
         
         try:
             # Build search query
@@ -61,7 +64,7 @@ class OutscraperScraper(BaseScraper):
             )
             
             if not results or len(results) == 0:
-                print(f"   ⚠️ No results found")
+                logger.warning("No results found")
                 return []
             
             # Extract and standardize reviews
@@ -85,11 +88,11 @@ class OutscraperScraper(BaseScraper):
                         'owner_answer_timestamp': review.get('owner_answer_timestamp_datetime_utc', ''),
                     })
             
-            print(f"   ✅ Scraped {len(reviews)} reviews")
+            logger.info("Scraped %d reviews", len(reviews))
             return reviews
             
         except Exception as e:
-            print(f"   ❌ Error scraping: {str(e)}")
+            logger.error("Error scraping: %s", e)
             return []
     
     def scrape_multiple(
@@ -114,7 +117,7 @@ class OutscraperScraper(BaseScraper):
         results = {}
         
         for query in queries:
-            print(f"\n{'='*60}")
+            logger.info("=" * 60)
             reviews = self.scrape(
                 query=query,
                 location=location,

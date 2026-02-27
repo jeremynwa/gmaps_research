@@ -16,6 +16,7 @@ from src.processors.orchestrator import Orchestrator
 from src.exporters.excel_exporter import ExcelExporter
 from src.exporters.json_exporter import JSONExporter
 from src.utils.cost_calculator import CostCalculator
+from src.utils.log import setup_logging
 
 console = Console()
 
@@ -29,13 +30,14 @@ def sanitize_filename(text: str) -> str:
     # Remove multiple underscores
     text = re.sub(r'_+', '_', text)
     # Limit length
-    return text[:50].strip('_')
+    return text[:Config.FILENAME_MAX_LENGTH].strip('_')
 
 
 @click.group()
-def cli():
+@click.option('--verbose', '-v', is_flag=True, help='Verbose output')
+def cli(verbose):
     """ReviewInsight Core - AI-powered review analysis."""
-    pass
+    setup_logging("DEBUG" if verbose else "INFO")
 
 
 @cli.command()
