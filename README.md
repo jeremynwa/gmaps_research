@@ -56,7 +56,7 @@ MAX_TOKENS=1000
 
 ## Cost Estimation
 ```bash
-python scripts/cost_estimator.py --reviews 2000
+python cli/main.py estimate --reviews 2000
 ```
 
 Output:
@@ -78,10 +78,10 @@ Estimated costs for 2,000 reviews:
 
 ## API Usage
 ```python
-from src.scrapers import OutscraperScraper
-from src.analyzers import AnthropicAnalyzer
-from src.processors import Orchestrator
-from src.exporters import ExcelExporter
+from src.scrapers.outscraper_scraper import OutscraperScraper
+from src.analyzers.anthropic_analyzer import AnthropicAnalyzer
+from src.processors.orchestrator import Orchestrator
+from src.exporters.excel_exporter import ExcelExporter
 
 # 1. Scrape reviews
 scraper = OutscraperScraper(api_key="...")
@@ -93,8 +93,7 @@ orchestrator = Orchestrator(analyzer)
 results = orchestrator.analyze(reviews, max_workers=10)
 
 # 3. Export
-exporter = ExcelExporter()
-exporter.export(results, "output.xlsx")
+ExcelExporter.export(results, "output.xlsx")
 ```
 
 ## Development
