@@ -50,7 +50,7 @@ docker-run:
 	docker-compose exec reviewinsight bash
 
 estimate:
-	python scripts/cost_estimator.py $(REVIEWS)
+	python -m cli.main estimate --reviews $(REVIEWS)
 
 analyze:
 	python -m cli.main analyze --input $(INPUT) --workers $(WORKERS)
